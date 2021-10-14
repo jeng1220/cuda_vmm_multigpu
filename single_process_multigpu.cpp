@@ -4,7 +4,7 @@
 #include <nccl.h>
 #include <vector>
 #if USE_CUDA_VMM
-#include "cuvector.h"
+#include "multidevicealloc_memmap.hpp"
 #endif
 
 #define CUDACHECK(cmd) do {                         \
@@ -39,6 +39,44 @@ checkDrvError(CUresult res, const char *tok, const char *file, unsigned line)
 }
 
 #define CHECK_DRV(x) checkDrvError(x, #x, __FILE__, __LINE__);
+
+// collect all of the devices whose memory can be mapped from cuDevice.
+std::vector<CUdevice> getBackingDevices(CUdevice cuDevice) {
+  int num_devices;
+
+  CHECK_DRV(cuDeviceGetCount(&num_devices));
+
+  std::vector<CUdevice> backingDevices;
+  backingDevices.push_back(cuDevice);
+  for (int dev = 0; dev < num_devices; dev++) {
+    int capable = 0;
+    int attributeVal = 0;
+
+    // The mapping device is already in the backingDevices vector
+    if (dev == cuDevice) {
+      continue;
+    }
+
+    // Only peer capable devices can map each others memory
+    CHECK_DRV(cuDeviceCanAccessPeer(&capable, cuDevice, dev));
+    if (!capable) {
+      continue;
+    }
+
+    // The device needs to support virtual address management for the required
+    // apis to work
+    CHECK_DRV(cuDeviceGetAttribute(
+        &attributeVal, CU_DEVICE_ATTRIBUTE_VIRTUAL_ADDRESS_MANAGEMENT_SUPPORTED,
+        cuDevice));
+    if (attributeVal == 0) {
+      continue;
+    }
+
+    backingDevices.push_back(dev);
+  }
+  return backingDevices;
+}
+
 #endif
 
 int main(int argc, char* argv[])
@@ -57,41 +95,27 @@ int main(int argc, char* argv[])
 
   // CUDA virtual memory management
 #if USE_CUDA_VMM
-  CUcontext ctx[2];
-  CUdevice dev[2];
-  int supportsVMM = 0;
-  typedef unsigned char ElemType;
-  typedef cuda_utils::Vector<ElemType, cuda_utils::VectorMemMap> VectorDUT;
+  std::vector<CUdevice> mappingDevices;
+  std::vector<CUdevice> backingDevices[2];
 
-  for (int i = 0; i < nDev; ++i) {
+  for (int i = 0; i<nDev; ++i) {
     CUDACHECK(cudaSetDevice(i));
-    cudaFree(0); // force runtime to create a context
-    CHECK_DRV(cuCtxGetCurrent(&ctx[i]));
-    CHECK_DRV(cuCtxGetDevice(&dev[i]));
-    CHECK_DRV(cuDeviceGetAttribute(&supportsVMM, CU_DEVICE_ATTRIBUTE_VIRTUAL_ADDRESS_MANAGEMENT_SUPPORTED, dev[i]));
-    if (not supportsVMM) {
-      fprintf(stderr, "not support CUDA VMM\n");
-      return 0;
-    }
+    cudaFree(0);
+    CUdevice cuDevice;
+    CHECK_DRV(cuDeviceGet(&cuDevice, i));
+    mappingDevices.push_back(cuDevice);
+    backingDevices[i] = getBackingDevices(cuDevice);
   }
 
-  std::vector<VectorDUT> sendbuffDuts{
-    VectorDUT(ctx[0]), VectorDUT(ctx[1])
-  };
-
-  std::vector<VectorDUT> recvbuffDuts{
-    VectorDUT(ctx[0]), VectorDUT(ctx[1])
-  };
+  size_t allocationSize = 0;
 #endif
 
   for (int i = 0; i < nDev; ++i) {
     CUDACHECK(cudaSetDevice(i));
 
 #if USE_CUDA_VMM
-    sendbuffDuts[i].grow(size * sizeof(float));
-    recvbuffDuts[i].grow(size * sizeof(float));
-    sendbuff[i] = reinterpret_cast<float*>(sendbuffDuts[i].getPointer());
-    recvbuff[i] = reinterpret_cast<float*>(recvbuffDuts[i].getPointer());
+    CHECK_DRV(simpleMallocMultiDeviceMmap(reinterpret_cast<CUdeviceptr*>(sendbuff + i), &allocationSize, size * sizeof(float), backingDevices[i], mappingDevices));
+    CHECK_DRV(simpleMallocMultiDeviceMmap(reinterpret_cast<CUdeviceptr*>(recvbuff + i), nullptr, size * sizeof(float), backingDevices[i], mappingDevices));
 #else
     CUDACHECK(cudaMalloc(sendbuff + i, size * sizeof(float)));
     CUDACHECK(cudaMalloc(recvbuff + i, size * sizeof(float)));
@@ -100,7 +124,6 @@ int main(int argc, char* argv[])
     CUDACHECK(cudaMemset(recvbuff[i], 0, size * sizeof(float)));
     CUDACHECK(cudaStreamCreate(s+i));
   }
-
 
   //initializing NCCL
   NCCLCHECK(ncclCommInitAll(comms, nDev, devs));
@@ -120,14 +143,17 @@ int main(int argc, char* argv[])
     CUDACHECK(cudaStreamSynchronize(s[i]));
   }
 
-#if !USE_CUDA_VMM
   //free device buffers
   for (int i = 0; i < nDev; ++i) {
     CUDACHECK(cudaSetDevice(i));
+#if USE_CUDA_VMM
+    CHECK_DRV(simpleFreeMultiDeviceMmap(reinterpret_cast<CUdeviceptr>(sendbuff[i]), allocationSize));
+    CHECK_DRV(simpleFreeMultiDeviceMmap(reinterpret_cast<CUdeviceptr>(recvbuff[i]), allocationSize));
+#else
     CUDACHECK(cudaFree(sendbuff[i]));
     CUDACHECK(cudaFree(recvbuff[i]));
-  }
 #endif
+  }
 
   //finalizing NCCL
   for(int i = 0; i < nDev; ++i)
