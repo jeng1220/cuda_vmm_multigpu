@@ -27,8 +27,7 @@
 } while(0)
 
 #if USE_CUDA_VMM
-static inline void
-checkDrvError(CUresult res, const char *tok, const char *file, unsigned line)
+void checkDrvError(CUresult res, const char *tok, const char *file, unsigned line)
 {
   if (res != CUDA_SUCCESS) {
     const char *errStr = NULL;
@@ -76,7 +75,6 @@ std::vector<CUdevice> getBackingDevices(CUdevice cuDevice) {
   }
   return backingDevices;
 }
-
 #endif
 
 int main(int argc, char* argv[])
@@ -156,8 +154,9 @@ int main(int argc, char* argv[])
   }
 
   //finalizing NCCL
-  for(int i = 0; i < nDev; ++i)
-      ncclCommDestroy(comms[i]);
+  for(int i = 0; i < nDev; ++i) {
+    NCCLCHECK(ncclCommDestroy(comms[i]));
+  }
 
   printf("Success \n");
   return 0;
