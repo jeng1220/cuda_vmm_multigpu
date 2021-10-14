@@ -143,7 +143,7 @@ int main(int argc, char* argv[])
   std::vector<CUdevice> backingDevices;
 
   CUDACHECK(cudaSetDevice(localRank));
-  cudaFree(0);
+  cudaFree(0); // force runtime to create a ctx
   CUdevice cuDevice;
   CHECK_DRV(cuDeviceGet(&cuDevice, localRank));
   mappingDevices.push_back(cuDevice);
