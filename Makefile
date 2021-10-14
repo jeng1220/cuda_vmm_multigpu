@@ -32,7 +32,7 @@ vector_example: vector_main.cpp cuvector.cpp
 	$(NVCC) $^ -o $@ -lcuda -std=c++11
 
 single_process_multigpu: single_process_multigpu.cpp cuvector.cpp
-	$(NVCC) $^ -o $@ -lnccl -lcuda -std=c++11
+	$(NVCC) $^ -o $@ -DUSE_CUDA_VMM=${USE_CUDA_VMM} -lnccl -lcuda -std=c++11
 
 multiprocess_multigpu: multiprocess_multigpu.cpp cuvector.cpp
 	mpic++ $^ -o $@ -std=c++11 -cudalib=nccl -lcuda

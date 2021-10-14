@@ -9,7 +9,8 @@ Two examples demonstrate the interoperability between CUDA virtual memory manage
 
 ## Build ##
 ```sh
-$ make -j`nproc`
+$ USE_CUDA_VMM=0 make -j`nproc` # without CUDA virtual memory management
+$ USE_CUDA_VMM=1 make -j`nproc` # with CUDA virtual memory management
 ```
 
 ## Run ##
