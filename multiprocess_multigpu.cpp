@@ -147,7 +147,8 @@ int main(int argc, char* argv[])
   CUdevice cuDevice;
   CHECK_DRV(cuDeviceGet(&cuDevice, localRank));
   mappingDevices.push_back(cuDevice);
-  backingDevices = getBackingDevices(cuDevice);
+  //backingDevices = getBackingDevices(cuDevice);
+  backingDevices.push_back(cuDevice);
 
   size_t allocationSize = 0;
 #endif

@@ -102,7 +102,8 @@ int main(int argc, char* argv[])
     CUdevice cuDevice;
     CHECK_DRV(cuDeviceGet(&cuDevice, i));
     mappingDevices.push_back(cuDevice);
-    backingDevices[i] = getBackingDevices(cuDevice);
+    //backingDevices[i] = getBackingDevices(cuDevice);
+    backingDevices[i].push_back(cuDevice);
   }
 
   size_t allocationSize = 0;
