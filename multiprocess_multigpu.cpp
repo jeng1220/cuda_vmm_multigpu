@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cuda_runtime.h>
@@ -121,6 +122,9 @@ int main(int argc, char* argv[])
   uint64_t hostHashs[nRanks];
   char hostname[1024];
   getHostName(hostname, 1024);
+  auto pid = getpid();
+  printf("MPI Rank %d, MPI Size %d, PID %u, Host %s\n", myRank, nRanks, pid, hostname);
+
   hostHashs[myRank] = getHostHash(hostname);
   MPICHECK(MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, hostHashs, sizeof(uint64_t), MPI_BYTE, MPI_COMM_WORLD));
   for (int p=0; p<nRanks; p++) {
