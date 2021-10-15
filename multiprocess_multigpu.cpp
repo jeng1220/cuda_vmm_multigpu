@@ -155,8 +155,8 @@ int main(int argc, char* argv[])
   //picking a GPU based on localRank, allocate device buffers
   CUDACHECK(cudaSetDevice(localRank));
 #if USE_CUDA_VMM
-    CHECK_DRV(simpleMallocMultiDeviceMmap(reinterpret_cast<CUdeviceptr*>(&sendbuff), &allocationSize, size * sizeof(float), backingDevices, mappingDevices));
-    CHECK_DRV(simpleMallocMultiDeviceMmap(reinterpret_cast<CUdeviceptr*>(&recvbuff), nullptr, size * sizeof(float), backingDevices, mappingDevices));
+  CHECK_DRV(simpleMallocMultiDeviceMmap(reinterpret_cast<CUdeviceptr*>(&sendbuff), &allocationSize, size * sizeof(float), backingDevices, mappingDevices));
+  CHECK_DRV(simpleMallocMultiDeviceMmap(reinterpret_cast<CUdeviceptr*>(&recvbuff), nullptr, size * sizeof(float), backingDevices, mappingDevices));
 #else
   CUDACHECK(cudaMalloc(&sendbuff, size * sizeof(float)));
   CUDACHECK(cudaMalloc(&recvbuff, size * sizeof(float)));
