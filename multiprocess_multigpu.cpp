@@ -163,7 +163,6 @@ int main(int argc, char* argv[])
 #endif  
   CUDACHECK(cudaStreamCreate(&s));
 
-
   //initializing NCCL
   NCCLCHECK(ncclCommInitRank(&comm, nRanks, id, myRank));
 
@@ -175,8 +174,8 @@ int main(int argc, char* argv[])
 
   //free device buffers
 #if USE_CUDA_VMM
-    CHECK_DRV(simpleFreeMultiDeviceMmap(reinterpret_cast<CUdeviceptr>(sendbuff), allocationSize));
-    CHECK_DRV(simpleFreeMultiDeviceMmap(reinterpret_cast<CUdeviceptr>(recvbuff), allocationSize));
+  CHECK_DRV(simpleFreeMultiDeviceMmap(reinterpret_cast<CUdeviceptr>(sendbuff), allocationSize));
+  CHECK_DRV(simpleFreeMultiDeviceMmap(reinterpret_cast<CUdeviceptr>(recvbuff), allocationSize));
 #else
   CUDACHECK(cudaFree(sendbuff));
   CUDACHECK(cudaFree(recvbuff));
